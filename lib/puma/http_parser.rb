@@ -104,6 +104,24 @@ module Puma
 
     INVALID_FORMAT_MESSAGE = "Invalid HTTP format, parsing fails. Are you trying to open an SSL connection to a non-SSL Puma?"
 
+    # Maximum allowed lengths of the request elements, and their error messages.
+    # The messages spell the limits exactly as the C extension does, where they
+    # come from the macro text, e.g. "(1024 * 12)". Tests assert on them.
+    MAX_FIELD_NAME_LENGTH = 256
+    MAX_FIELD_NAME_LENGTH_ERR = "HTTP element FIELD_NAME is longer than the 256 allowed length (was %d)"
+    MAX_FIELD_VALUE_LENGTH = 80 * 1024
+    MAX_FIELD_VALUE_LENGTH_ERR = "HTTP element FIELD_VALUE is longer than the 80 * 1024 allowed length (was %d)"
+    MAX_REQUEST_URI_LENGTH = 1024 * 12
+    MAX_REQUEST_URI_LENGTH_ERR = "HTTP element REQUEST_URI is longer than the (1024 * 12) allowed length (was %d)"
+    MAX_FRAGMENT_LENGTH = 1024
+    MAX_FRAGMENT_LENGTH_ERR = "HTTP element FRAGMENT is longer than the 1024 allowed length (was %d)"
+    MAX_REQUEST_PATH_LENGTH = 8192
+    MAX_REQUEST_PATH_LENGTH_ERR = "HTTP element REQUEST_PATH is longer than the (8192) allowed length (was %d)"
+    MAX_QUERY_STRING_LENGTH = 1024 * 10
+    MAX_QUERY_STRING_LENGTH_ERR = "HTTP element QUERY_STRING is longer than the (1024 * 10) allowed length (was %d)"
+    MAX_HEADER_LENGTH = 1024 * (80 + 32)
+    MAX_HEADER_LENGTH_ERR = "HTTP element HEADER is longer than the (1024 * (80 + 32)) allowed length (was %d)"
+
     def initialize
       reset
     end
@@ -161,6 +179,7 @@ module Puma
       stopped_at = run(start, @data.bytesize)
       @nread += stopped_at - start
 
+      validate_max_length(@nread, MAX_HEADER_LENGTH, MAX_HEADER_LENGTH_ERR)
       raise HttpParserError, INVALID_FORMAT_MESSAGE if error?
 
       @nread
@@ -417,13 +436,21 @@ module Puma
       position
     end
 
+    def validate_max_length(length, max_length, message)
+      raise HttpParserError, format(message, length) if length > max_length
+    end
+
     def http_field(position)
+      value_length = position - @mark
+      validate_max_length(@field_len, MAX_FIELD_NAME_LENGTH, MAX_FIELD_NAME_LENGTH_ERR)
+      validate_max_length(value_length, MAX_FIELD_VALUE_LENGTH, MAX_FIELD_VALUE_LENGTH_ERR)
+
       # Upcase, "-" becomes "_", and "_" becomes "," so that a header with
       # underscores cannot impersonate one with dashes.
       name = @data.byteslice(@field_start, @field_len).upcase.tr("-_", "_,")
       key = COMMON_FIELDS[name] || -"#{HTTP_PREFIX}#{name}"
 
-      value = @data.byteslice(@mark, position - @mark)
+      value = @data.byteslice(@mark, value_length)
       # Only spaces and tabs can be present; the grammar rejects other control bytes.
       value.strip!
 
@@ -441,19 +468,27 @@ module Puma
     end
 
     def request_uri(position)
-      @env[REQUEST_URI] = @data.byteslice(@mark, position - @mark)
+      length = position - @mark
+      validate_max_length(length, MAX_REQUEST_URI_LENGTH, MAX_REQUEST_URI_LENGTH_ERR)
+      @env[REQUEST_URI] = @data.byteslice(@mark, length)
     end
 
     def fragment(position)
-      @env[FRAGMENT] = @data.byteslice(@mark, position - @mark)
+      length = position - @mark
+      validate_max_length(length, MAX_FRAGMENT_LENGTH, MAX_FRAGMENT_LENGTH_ERR)
+      @env[FRAGMENT] = @data.byteslice(@mark, length)
     end
 
     def request_path(position)
-      @env[REQUEST_PATH] = @data.byteslice(@mark, position - @mark)
+      length = position - @mark
+      validate_max_length(length, MAX_REQUEST_PATH_LENGTH, MAX_REQUEST_PATH_LENGTH_ERR)
+      @env[REQUEST_PATH] = @data.byteslice(@mark, length)
     end
 
     def query_string(position)
-      @env[QUERY_STRING] = @data.byteslice(@query_start, position - @query_start)
+      length = position - @query_start
+      validate_max_length(length, MAX_QUERY_STRING_LENGTH, MAX_QUERY_STRING_LENGTH_ERR)
+      @env[QUERY_STRING] = @data.byteslice(@query_start, length)
     end
 
     def server_protocol(position)
