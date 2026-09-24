@@ -19,8 +19,9 @@ module Puma
   # buffer as a side effect of parsing. This implementation never modifies
   # the buffer.
   class HttpParser
-    CR = 13
+    TAB = 9
     LF = 10
+    CR = 13
     SPACE = 32
     HASH = 35
     STAR = 42
@@ -42,9 +43,57 @@ module Puma
     # upper | digit | safe
     METHOD_BYTE = Array.new(256) { |byte| "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$-_.".bytes.include?(byte) }.freeze
     DIGIT_BYTE = Array.new(256) { |byte| "0123456789".bytes.include?(byte) }.freeze
+    TSPECIAL_BYTES = "()<>@,;:\\\"/[]?={} \t".bytes
+    # token = ascii -- (CTL | tspecials)
+    FIELD_NAME_BYTE = Array.new(256) { |byte| byte < 128 && !CONTROL_BYTES.include?(byte) && !TSPECIAL_BYTES.include?(byte) }.freeze
+    # (any -- CTL) | "\t"
+    FIELD_VALUE_BYTE = Array.new(256) { |byte| byte == TAB || !CONTROL_BYTES.include?(byte) }.freeze
 
     METHOD_MAX_LENGTH = 20
     PROTOCOL_PREFIX = "HTTP/"
+    HTTP_PREFIX = "HTTP_"
+
+    # Env keys for the headers we expect to receive, so that parsing them
+    # allocates no key strings. CONTENT_LENGTH and CONTENT_TYPE have no HTTP_
+    # prefix, following the CGI convention.
+    COMMON_FIELDS = {
+      "ACCEPT" => "HTTP_ACCEPT",
+      "ACCEPT_CHARSET" => "HTTP_ACCEPT_CHARSET",
+      "ACCEPT_ENCODING" => "HTTP_ACCEPT_ENCODING",
+      "ACCEPT_LANGUAGE" => "HTTP_ACCEPT_LANGUAGE",
+      "ALLOW" => "HTTP_ALLOW",
+      "AUTHORIZATION" => "HTTP_AUTHORIZATION",
+      "CACHE_CONTROL" => "HTTP_CACHE_CONTROL",
+      "CONNECTION" => "HTTP_CONNECTION",
+      "CONTENT_ENCODING" => "HTTP_CONTENT_ENCODING",
+      "CONTENT_LENGTH" => "CONTENT_LENGTH",
+      "CONTENT_TYPE" => "CONTENT_TYPE",
+      "COOKIE" => "HTTP_COOKIE",
+      "DATE" => "HTTP_DATE",
+      "EXPECT" => "HTTP_EXPECT",
+      "FROM" => "HTTP_FROM",
+      "HOST" => "HTTP_HOST",
+      "IF_MATCH" => "HTTP_IF_MATCH",
+      "IF_MODIFIED_SINCE" => "HTTP_IF_MODIFIED_SINCE",
+      "IF_NONE_MATCH" => "HTTP_IF_NONE_MATCH",
+      "IF_RANGE" => "HTTP_IF_RANGE",
+      "IF_UNMODIFIED_SINCE" => "HTTP_IF_UNMODIFIED_SINCE",
+      "KEEP_ALIVE" => "HTTP_KEEP_ALIVE",
+      "MAX_FORWARDS" => "HTTP_MAX_FORWARDS",
+      "PRAGMA" => "HTTP_PRAGMA",
+      "PROXY_AUTHORIZATION" => "HTTP_PROXY_AUTHORIZATION",
+      "RANGE" => "HTTP_RANGE",
+      "REFERER" => "HTTP_REFERER",
+      "TE" => "HTTP_TE",
+      "TRAILER" => "HTTP_TRAILER",
+      "TRANSFER_ENCODING" => "HTTP_TRANSFER_ENCODING",
+      "UPGRADE" => "HTTP_UPGRADE",
+      "USER_AGENT" => "HTTP_USER_AGENT",
+      "VIA" => "HTTP_VIA",
+      "WARNING" => "HTTP_WARNING",
+      "X_FORWARDED_FOR" => "HTTP_X_FORWARDED_FOR",
+      "X_REAL_IP" => "HTTP_X_REAL_IP"
+    }.freeze
 
     REQUEST_METHOD = "REQUEST_METHOD"
     REQUEST_URI = "REQUEST_URI"
@@ -66,6 +115,8 @@ module Puma
       @nread = 0
       @mark = 0
       @query_start = 0
+      @field_start = 0
+      @field_len = 0
       @body_start = 0
       @body = nil
       @env = nil
@@ -294,6 +345,50 @@ module Puma
         when :header_line
           if byte == CR
             state = :final_lf
+          elsif FIELD_NAME_BYTE[byte]
+            @field_start = position
+            state = :field_name
+          else
+            state = :error
+            break
+          end
+        when :field_name
+          if FIELD_NAME_BYTE[byte]
+            # continue
+          elsif byte == COLON
+            @field_len = position - @field_start
+            state = :field_value_start
+          else
+            state = :error
+            break
+          end
+        when :field_value_start
+          if byte == SPACE
+            # leading spaces are not part of the value
+          elsif FIELD_VALUE_BYTE[byte]
+            @mark = position
+            state = :field_value
+          elsif byte == CR
+            @mark = position
+            http_field(position)
+            state = :header_lf
+          else
+            state = :error
+            break
+          end
+        when :field_value
+          if FIELD_VALUE_BYTE[byte]
+            # continue
+          elsif byte == CR
+            http_field(position)
+            state = :header_lf
+          else
+            state = :error
+            break
+          end
+        when :header_lf
+          if byte == LF
+            state = :header_line
           else
             state = :error
             break
@@ -320,6 +415,25 @@ module Puma
 
       @state = state
       position
+    end
+
+    def http_field(position)
+      # Upcase, "-" becomes "_", and "_" becomes "," so that a header with
+      # underscores cannot impersonate one with dashes.
+      name = @data.byteslice(@field_start, @field_len).upcase.tr("-_", "_,")
+      key = COMMON_FIELDS[name] || -"#{HTTP_PREFIX}#{name}"
+
+      value = @data.byteslice(@mark, position - @mark)
+      # Only spaces and tabs can be present; the grammar rejects other control bytes.
+      value.strip!
+
+      existing = @env[key]
+      if existing.nil?
+        @env[key] = value
+      else
+        # duplicate headers are normalized to comma-separated values
+        existing << ", " << value
+      end
     end
 
     def request_method(position)
