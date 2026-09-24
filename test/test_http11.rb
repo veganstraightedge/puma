@@ -7,8 +7,6 @@ require_relative "helper"
 require_relative "helpers/integration"
 require "digest"
 
-require "puma/puma_http11"
-
 class Http11ParserTest < TestIntegration
 
   parallelize_me! unless ::Puma::IS_JRUBY && RUBY_DESCRIPTION.include?('x86_64-darwin')

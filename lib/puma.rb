@@ -8,8 +8,26 @@ require 'stringio'
 
 require 'thread'
 
-# use require, see https://github.com/puma/puma/pull/2381
-require 'puma/puma_http11'
+module Puma
+  # The `puma_http11` extension (C on MRI, Java on JRuby) provides `HttpParser`
+  # and `MiniSSL::Engine`. Setting `PUMA_PURE_RUBY=true` selects the pure Ruby
+  # `HttpParser` in `puma/http_parser` instead, which is also used when the
+  # extension cannot be loaded. The pure Ruby parser has no SSL support.
+  HAS_NATIVE_HTTP_PARSER =
+    if ENV['PUMA_PURE_RUBY'] == 'true'
+      false
+    else
+      begin
+        # use require, see https://github.com/puma/puma/pull/2381
+        require 'puma/puma_http11'
+        true
+      rescue LoadError
+        false
+      end
+    end
+
+  require_relative 'puma/http_parser' unless HAS_NATIVE_HTTP_PARSER
+end
 
 require_relative 'puma/detect'
 require_relative 'puma/json_serialization'
