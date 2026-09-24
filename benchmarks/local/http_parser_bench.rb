@@ -6,10 +6,10 @@
 #   bundle exec ruby benchmarks/local/http_parser_bench.rb
 #
 # It runs itself twice as a child process, once with PUMA_PURE_RUBY=true, so
-# that both parsers are measured in the same Ruby with the same options, and
-# prints a comparison table. Pass Ruby options through RUBYOPT, e.g.
+# that both parsers are measured in the same Ruby, and prints a comparison
+# table. The children get the JIT the parent runs with, e.g.
 #
-#   RUBYOPT=--yjit bundle exec ruby benchmarks/local/http_parser_bench.rb
+#   bundle exec ruby --yjit benchmarks/local/http_parser_bench.rb
 
 require "json"
 require "rbconfig"
@@ -79,9 +79,16 @@ def measure
   }
 end
 
+def jit_flags
+  flags = []
+  flags << "--yjit" if defined?(RubyVM::YJIT) && RubyVM::YJIT.enabled?
+  flags << "--zjit" if defined?(RubyVM::ZJIT) && RubyVM::ZJIT.enabled?
+  flags
+end
+
 def run_child(pure_ruby)
   env = { "PUMA_PURE_RUBY" => pure_ruby ? "true" : nil }
-  output = IO.popen([env, RbConfig.ruby, "-Ilib", __FILE__, "--measure"], &:read)
+  output = IO.popen([env, RbConfig.ruby, *jit_flags, "-Ilib", __FILE__, "--measure"], &:read)
   JSON.parse(output)
 end
 
@@ -90,9 +97,9 @@ if ARGV.include?("--measure")
 else
   native = run_child(false)
   pure = run_child(true)
-  yjit = defined?(RubyVM::YJIT) && RubyVM::YJIT.enabled? ? "on" : "off"
+  jit = jit_flags.empty? ? "no JIT" : jit_flags.join(" ")
 
-  puts "#{RUBY_DESCRIPTION}, YJIT #{yjit}, #{ITERATIONS} iterations per request"
+  puts "#{RUBY_DESCRIPTION}, #{jit}, #{ITERATIONS} iterations per request"
   puts
   puts "| request     | #{native['parser']} µs | #{pure['parser']} µs | slowdown |"
   puts "|:------------|---------------:|-------------:|---------:|"
