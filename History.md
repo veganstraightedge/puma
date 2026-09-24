@@ -1,3 +1,11 @@
+## Unreleased
+
+* Features
+  * Add a pure Ruby `HttpParser`, used when `PUMA_PURE_RUBY=true` or when the `puma_http11` extension cannot be loaded. `Puma::HAS_NATIVE_HTTP_PARSER` reports which one is in use. The pure Ruby parser has no SSL support.
+
+* Bugfixes
+  * `puma/client` requires `puma/null_io` itself instead of relying on `MiniSSL` to load it
+
 ## 8.0.2 / 2026-05-27
 
 * Bugfixes
