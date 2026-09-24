@@ -292,4 +292,156 @@ class Http11ParserTest < TestIntegration
 
     assert_equal "Valid\tValue", req['HTTP_DUMMY']
   end
+
+  def test_parse_in_chunks
+    parser = Puma::HttpParser.new
+    req = {}
+    buffer = +""
+    nread = 0
+
+    ["GET /ab", "c?d=1 HTTP/1.1\r\nHo", "st: x\r\n\r\nbody"].each do |chunk|
+      refute parser.finished?
+      buffer << chunk
+      nread = parser.execute(req, buffer, nread)
+    end
+
+    assert parser.finished?
+    assert_equal buffer.bytesize - "body".bytesize, nread
+    assert_equal '/abc', req['REQUEST_PATH']
+    assert_equal 'd=1', req['QUERY_STRING']
+    assert_equal '/abc?d=1', req['REQUEST_URI']
+    assert_equal 'x', req['HTTP_HOST']
+    assert_equal 'body', parser.body
+  end
+
+  def test_error_in_later_chunk
+    parser = Puma::HttpParser.new
+    req = {}
+    buffer = +"GET / HT"
+    nread = parser.execute(req, buffer, 0)
+    refute parser.error?
+
+    buffer << "TX"
+    assert_raises(Puma::HttpParserError) { parser.execute(req, buffer, nread) }
+    assert parser.error?
+    refute parser.finished?
+  end
+
+  def test_execute_after_finished_is_an_error
+    parser = Puma::HttpParser.new
+    buffer = +"GET / HTTP/1.1\r\n\r\n"
+    nread = parser.execute({}, buffer, 0)
+    assert parser.finished?
+
+    buffer << "GET / HTTP/1.1\r\n\r\n"
+    assert_raises(Puma::HttpParserError) { parser.execute({}, buffer, nread) }
+    assert parser.error?
+  end
+
+  def test_start_after_buffer_end
+    parser = Puma::HttpParser.new
+    http = "GET / HTTP/1.1\r\n\r\n"
+
+    error = assert_raises(Puma::HttpParserError) { parser.execute({}, http, http.bytesize) }
+    assert_equal "Requested start is after data buffer end.", error.message
+  end
+
+  def test_body
+    parser = Puma::HttpParser.new
+    http = "GET / HTTP/1.1\r\nContent-Length: 3\r\n\r\nabc"
+    nread = parser.execute({}, http, 0)
+
+    assert_equal http.bytesize - 3, nread
+    assert_equal "abc", parser.body
+
+    parser.reset
+    assert_nil parser.body
+    parser.execute({}, "GET / HTTP/1.1\r\n\r\n", 0)
+    assert_equal "", parser.body
+  end
+
+  def test_duplicate_headers_are_joined
+    parser = Puma::HttpParser.new
+    req = {}
+    parser.execute(req, "GET / HTTP/1.1\r\nX-A: 1\r\nx-a: 2\r\n\r\n", 0)
+
+    assert_equal "1, 2", req['HTTP_X_A']
+  end
+
+  def test_empty_header_value
+    parser = Puma::HttpParser.new
+    req = {}
+    parser.execute(req, "GET / HTTP/1.1\r\nX-Empty:\r\nX-Spaces:   \r\nX-Tab:\tv\r\n\r\n", 0)
+
+    assert_equal "", req['HTTP_X_EMPTY']
+    assert_equal "", req['HTTP_X_SPACES']
+    assert_equal "v", req['HTTP_X_TAB']
+  end
+
+  def test_underscore_in_header_name_becomes_comma
+    parser = Puma::HttpParser.new
+    req = {}
+    parser.execute(req, "GET / HTTP/1.1\r\nX_Forwarded_For: 1\r\nX-Forwarded-For: 2\r\n\r\n", 0)
+
+    assert_equal "1", req['HTTP_X,FORWARDED,FOR']
+    assert_equal "2", req['HTTP_X_FORWARDED_FOR']
+  end
+
+  def test_content_length_and_type_keys_have_no_prefix
+    parser = Puma::HttpParser.new
+    req = {}
+    parser.execute(req, "GET / HTTP/1.1\r\ncontent-length: 3\r\ncontent-type: t\r\n\r\nabc", 0)
+
+    assert_equal "3", req['CONTENT_LENGTH']
+    assert_equal "t", req['CONTENT_TYPE']
+    assert_nil req['HTTP_CONTENT_LENGTH']
+  end
+
+  def test_star_request_uri
+    parser = Puma::HttpParser.new
+    req = {}
+    parser.execute(req, "OPTIONS * HTTP/1.1\r\n\r\n", 0)
+
+    assert_equal "OPTIONS", req['REQUEST_METHOD']
+    assert_equal "*", req['REQUEST_URI']
+    assert_nil req['REQUEST_PATH']
+  end
+
+  def test_high_bytes_in_uri
+    parser = Puma::HttpParser.new
+    req = {}
+    parser.execute(req, "GET /caf\xC3\xA9?x=\xFF HTTP/1.1\r\n\r\n".b, 0)
+
+    assert_equal "/caf\xC3\xA9".b, req['REQUEST_PATH']
+    assert_equal "x=\xFF".b, req['QUERY_STRING']
+  end
+
+  def test_env_values_are_binary_and_keys_utf8
+    parser = Puma::HttpParser.new
+    req = {}
+    parser.execute(req, "GET /a?b=c HTTP/1.1\r\nHost: h\r\nX-Unusual: u\r\n\r\n", 0)
+
+    req.each do |key, value|
+      assert_equal Encoding::UTF_8, key.encoding, key
+      assert_equal Encoding::BINARY, value.encoding, key
+    end
+  end
+
+  def test_method_length_limit
+    parser = Puma::HttpParser.new
+    req = {}
+    parser.execute(req, "#{'A' * 20} / HTTP/1.1\r\n\r\n", 0)
+    assert_equal 'A' * 20, req['REQUEST_METHOD']
+
+    parser.reset
+    assert_raises(Puma::HttpParserError) { parser.execute({}, "#{'A' * 21} / HTTP/1.1\r\n\r\n", 0) }
+  end
+
+  def test_rejects_lowercase_method_and_bare_word_uri
+    ["get / HTTP/1.1\r\n\r\n", "GET abc HTTP/1.1\r\n\r\n", "GET  / HTTP/1.1\r\n\r\n", "GET / HTTP/1.\r\n\r\n"].each do |http|
+      parser = Puma::HttpParser.new
+      assert_raises(Puma::HttpParserError, http) { parser.execute({}, http, 0) }
+      assert parser.error?, http
+    end
+  end
 end
