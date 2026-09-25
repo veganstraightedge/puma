@@ -7,7 +7,7 @@ C extension.
 
 Setting the environment variable `PUMA_RUBY_HTTP_PARSER=true` while installing skips
 compiling the extension, so no compiler or OpenSSL headers are needed. The same
-variable must be set when Puma runs, which selects the pure Ruby HTTP parser.
+variable must be set when Puma runs, which selects the Ruby HTTP parser.
 Puma then has no SSL support.
 
 ```

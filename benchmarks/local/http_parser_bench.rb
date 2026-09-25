@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Compares the parsing speed of the puma_http11 extension with the pure Ruby
+# Compares the parsing speed of the puma_http11 extension with the Ruby
 # HttpParser (lib/puma/http_parser.rb). Run from the repo root:
 #
 #   bundle exec ruby benchmarks/local/http_parser_bench.rb
@@ -74,7 +74,7 @@ def measure
   end
 
   {
-    "parser" => Puma.ruby_http_parser? ? "pure Ruby" : "puma_http11",
+    "parser" => Puma.ruby_http_parser? ? "Ruby" : "puma_http11",
     "microseconds" => microseconds
   }
 end
@@ -86,8 +86,8 @@ def jit_flags
   flags
 end
 
-def run_child(pure_ruby)
-  env = { "PUMA_RUBY_HTTP_PARSER" => pure_ruby ? "true" : nil }
+def run_child(ruby_http_parser:)
+  env = { "PUMA_RUBY_HTTP_PARSER" => ruby_http_parser ? "true" : nil }
   output = IO.popen([env, RbConfig.ruby, *jit_flags, "-Ilib", __FILE__, "--measure"], &:read)
   JSON.parse(output)
 end
@@ -95,17 +95,17 @@ end
 if ARGV.include?("--measure")
   puts JSON.generate(measure)
 else
-  native = run_child(false)
-  pure = run_child(true)
+  native = run_child(ruby_http_parser: false)
+  ruby = run_child(ruby_http_parser: true)
   jit = jit_flags.empty? ? "no JIT" : jit_flags.join(" ")
 
   puts "#{RUBY_DESCRIPTION}, #{jit}, #{ITERATIONS} iterations per request"
   puts
-  puts "| request     | #{native['parser']} µs | #{pure['parser']} µs | slowdown |"
-  puts "|:------------|---------------:|-------------:|---------:|"
+  puts "| request     | #{native['parser']} µs | #{ruby['parser']} µs | slowdown |"
+  puts "|:------------|---------------:|--------:|---------:|"
   REQUESTS.each_key do |name|
     native_us = native["microseconds"][name]
-    pure_us = pure["microseconds"][name]
-    puts format("| %-11s | %14.2f | %12.2f | %7.1fx |", name, native_us, pure_us, pure_us / native_us)
+    ruby_us = ruby["microseconds"][name]
+    puts format("| %-11s | %14.2f | %7.2f | %7.1fx |", name, native_us, ruby_us, ruby_us / native_us)
   end
 end

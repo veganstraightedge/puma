@@ -3,7 +3,7 @@
 module Puma
   class HttpParserError < StandardError; end
 
-  # Pure Ruby port of the `puma_http11` C extension (`ext/puma_http11`).
+  # Ruby port of the `puma_http11` C extension (`ext/puma_http11`).
   #
   # It is a streaming state machine that mirrors the Ragel grammar in
   # `ext/puma_http11/http11_parser_common.rl`, one state per grammar element.

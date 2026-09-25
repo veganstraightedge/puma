@@ -1,13 +1,13 @@
 ## Unreleased
 
 * Features
-  * Add a pure Ruby `HttpParser`, opt in with `PUMA_RUBY_HTTP_PARSER=true`. Setting it while installing the gem skips compiling the extension. `Puma.http_parser_engine` reports `c`, `java`, or `ruby`. The pure Ruby parser has no SSL support.
+  * Add a Ruby `HttpParser`, opt in with `PUMA_RUBY_HTTP_PARSER=true`. Setting it while installing the gem skips compiling the extension. `Puma.http_parser_engine` reports `c`, `java`, or `ruby`. The Ruby parser has no SSL support.
 
 * Bugfixes
   * `puma/client` requires `puma/null_io` itself instead of relying on `MiniSSL` to load it
 
 * Performance
-  * Pure Ruby `HttpParser` scans runs of bytes with regexps and handles complete header lines in one match
+  * Ruby `HttpParser` scans runs of bytes with regexps and handles complete header lines in one match
 
 ## 8.0.2 / 2026-05-27
 

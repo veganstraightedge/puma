@@ -14,12 +14,12 @@ module Puma
   # The HTTP parser implementation, one of the following (as a string):
   # * c: the puma_http11 C extension, the default on MRI
   # * java: the puma_http11 Java extension, the default on JRuby
-  # * ruby: pure Ruby, see `puma/http_parser`
+  # * ruby: written in Ruby, see `puma/http_parser`
   def self.http_parser_engine
     HTTP_PARSER_ENGINE
   end
 
-  # The pure Ruby parser is opt-in with `PUMA_RUBY_HTTP_PARSER=true`.
+  # The Ruby parser is opt-in with `PUMA_RUBY_HTTP_PARSER=true`.
   # It has no SSL support, since `MiniSSL::Engine` is only provided by the c-extension.
   def self.ruby_http_parser?(env = ENV)
     env['PUMA_RUBY_HTTP_PARSER'] == 'true'
@@ -35,7 +35,7 @@ else
     require 'puma/puma_http11'
   rescue LoadError => e
     raise LoadError, "#{e.message}\nPuma's puma_http11 extension is not available. " \
-      "Reinstall the gem with a compiler, or set PUMA_RUBY_HTTP_PARSER=true to use the pure Ruby HTTP parser."
+      "Reinstall the gem with a compiler, or set PUMA_RUBY_HTTP_PARSER=true to use the Ruby HTTP parser."
   end
   Puma::HTTP_PARSER_ENGINE = Puma::IS_JRUBY ? 'java' : 'c'
 end

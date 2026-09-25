@@ -440,7 +440,7 @@ class Http11ParserTest < TestIntegration
   end
 
   def test_run_end_regexps_agree_with_byte_tables
-    skip "pure Ruby parser only" unless Puma.http_parser_engine == "ruby"
+    skip "Ruby parser only" unless Puma.http_parser_engine == "ruby"
     parser = Puma::HttpParser
 
     {
@@ -460,7 +460,7 @@ class Http11ParserTest < TestIntegration
   # The one-match header line path must be exactly as strict as the byte tables,
   # since only lines it rejects reach the byte by byte path.
   def test_header_line_regexp_agrees_with_byte_tables
-    skip "pure Ruby parser only" unless Puma.http_parser_engine == "ruby"
+    skip "Ruby parser only" unless Puma.http_parser_engine == "ruby"
     parser = Puma::HttpParser
 
     256.times do |byte|
