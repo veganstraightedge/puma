@@ -37,7 +37,7 @@ else
     raise LoadError, "#{e.message}\nPuma's puma_http11 extension is not available. " \
       "Reinstall the gem with a compiler, or set PUMA_RUBY_HTTP_PARSER=true to use the Ruby HTTP parser."
   end
-  Puma::HTTP_PARSER_ENGINE = Puma::IS_JRUBY ? 'java' : 'c'
+  Puma::HTTP_PARSER_ENGINE = Puma.jruby? ? 'java' : 'c'
 end
 
 require_relative 'puma/json_serialization'
