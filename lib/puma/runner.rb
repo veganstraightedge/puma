@@ -100,6 +100,7 @@ module Puma
       log "Puma starting in #{mode} mode..."
       log "* Puma version: #{Puma::Const::PUMA_VERSION} (\"#{Puma::Const::CODE_NAME}\")"
       log "* Ruby version: #{RUBY_DESCRIPTION}"
+      log "*  HTTP parser: #{Puma.http_parser_engine}" if Puma.ruby_http_parser?
       log "*  Min threads: #{min_t}"
       log "*  Max threads: #{max_t}"
       log "*  Environment: #{environment}"
