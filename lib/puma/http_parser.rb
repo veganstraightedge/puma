@@ -1,9 +1,5 @@
 # frozen_string_literal: true
 
-# Copyright (c) 2005 Zed A. Shaw
-# You can redistribute it and/or modify it under the same terms as Ruby.
-# License 3-clause BSD
-
 module Puma
   class HttpParserError < StandardError; end
 
