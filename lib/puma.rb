@@ -8,28 +8,38 @@ require 'stringio'
 
 require 'thread'
 
-module Puma
-  # The `puma_http11` extension (C on MRI, Java on JRuby) provides `HttpParser`
-  # and `MiniSSL::Engine`. Setting `PUMA_PURE_RUBY=true` selects the pure Ruby
-  # `HttpParser` in `puma/http_parser` instead, which is also used when the
-  # extension cannot be loaded. The pure Ruby parser has no SSL support.
-  HAS_NATIVE_HTTP_PARSER =
-    if ENV['PUMA_PURE_RUBY'] == 'true'
-      false
-    else
-      begin
-        # use require, see https://github.com/puma/puma/pull/2381
-        require 'puma/puma_http11'
-        true
-      rescue LoadError
-        false
-      end
-    end
+require_relative 'puma/detect'
 
-  require_relative 'puma/http_parser' unless HAS_NATIVE_HTTP_PARSER
+module Puma
+  # The HTTP parser implementation, one of the following (as a string):
+  # * c: the puma_http11 C extension, the default on MRI
+  # * java: the puma_http11 Java extension, the default on JRuby
+  # * ruby: pure Ruby, see `puma/http_parser`
+  def self.http_parser_engine
+    HTTP_PARSER_ENGINE
+  end
+
+  # The pure Ruby parser is opt-in with `PUMA_PURE_RUBY=true`. It has no SSL
+  # support, since `MiniSSL::Engine` is only provided by the extension.
+  def self.pure_http_parser?(env = ENV)
+    env['PUMA_PURE_RUBY'] == 'true'
+  end
 end
 
-require_relative 'puma/detect'
+if Puma.pure_http_parser?
+  require_relative 'puma/http_parser'
+  Puma::HTTP_PARSER_ENGINE = 'ruby'
+else
+  begin
+    # use require, see https://github.com/puma/puma/pull/2381
+    require 'puma/puma_http11'
+  rescue LoadError => e
+    raise LoadError, "#{e.message}\nPuma's puma_http11 extension is not available. " \
+      "Reinstall the gem with a compiler, or set PUMA_PURE_RUBY=true to use the pure Ruby HTTP parser."
+  end
+  Puma::HTTP_PARSER_ENGINE = Puma::IS_JRUBY ? 'java' : 'c'
+end
+
 require_relative 'puma/json_serialization'
 
 module Puma

@@ -595,7 +595,7 @@ class TestRequestHeadersInvalid < TestRequestBase
     request = "GET / HTTP/1.1\r\nHost: test.com\r\nno-return: 10\nContent-Length: 11\r\n\r\nHello World"
 
     # the C extension upcases header names in the buffer while parsing
-    msg = Puma::IS_JRUBY || !Puma::HAS_NATIVE_HTTP_PARSER ?
+    msg = Puma.http_parser_engine != "c" ?
       "Invalid HTTP format, parsing fails. Bad headers\nHost: test.com\nno-return: 10\\nContent-Length: 11" :
       "Invalid HTTP format, parsing fails. Bad headers\nHOST: test.com\nNO_RETURN: 10\\nContent-Length: 11"
 
@@ -606,7 +606,7 @@ class TestRequestHeadersInvalid < TestRequestBase
     request = "GET / HTTP/1.1\r\nHost: test.com\r\nno-newline: 10\rContent-Length: 11\r\n\r\nHello World"
 
     # the C extension upcases header names in the buffer while parsing
-    msg = Puma::IS_JRUBY || !Puma::HAS_NATIVE_HTTP_PARSER ?
+    msg = Puma.http_parser_engine != "c" ?
       "Invalid HTTP format, parsing fails. Bad headers\nHost: test.com\nno-newline: 10\rContent-Length: 11" :
       "Invalid HTTP format, parsing fails. Bad headers\nHOST: test.com\nNO_NEWLINE: 10\rContent-Length: 11"
 

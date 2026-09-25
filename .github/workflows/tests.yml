@@ -35,7 +35,7 @@ jobs:
 
   test_mri:
     name: >-
-      ${{ matrix.os }} ${{ matrix.ruby }}${{ matrix.no-ssl }}${{ matrix.yjit }}${{ matrix.rack-v }}
+      ${{ matrix.os }} ${{ matrix.ruby }}${{ matrix.no-ssl }}${{ matrix.pure-ruby }}${{ matrix.yjit }}${{ matrix.rack-v }}
     needs: [rubocop]
     env:
       CI: true
@@ -55,12 +55,18 @@ jobs:
               windows-2022 ]
         ruby: [ '3.0', 3.1, 3.2, 3.3, 3.4, '4.0', head ]
         no-ssl: ['']
+        pure-ruby: ['']
         rack-v: ['']
         yjit: ['']
         include:
           - { os: windows-2025    , ruby:  ucrt }
           - { os: windows-2025    , ruby:  mswin }
           - { os: windows-2025    , ruby: '3.0' , no-ssl: ' no SSL' }
+          - { os: windows-2025    , ruby:  3.4  , pure-ruby: ' pure Ruby' }
+          - { os: ubuntu-22.04    , ruby: '3.0' , pure-ruby: ' pure Ruby' }
+          - { os: ubuntu-24.04    , ruby:  3.4  , pure-ruby: ' pure Ruby' }
+          - { os: ubuntu-24.04    , ruby:  head , pure-ruby: ' pure Ruby', yjit: ' yjit' }
+          - { os: macos-15        , ruby: '4.0' , pure-ruby: ' pure Ruby' }
           - { os: windows-11-arm  , ruby:  3.4 }
           - { os: windows-11-arm  , ruby:  head }
           - { os: ubuntu-26.04-arm, ruby:  head , yjit: ' yjit'     }
@@ -100,6 +106,11 @@ jobs:
         if: matrix.no-ssl == ' no SSL'
         shell: bash
         run: echo 'PUMA_DISABLE_SSL=true' >> $GITHUB_ENV
+
+      - name: Use the pure Ruby HTTP parser, which also skips compiling the extension
+        if: matrix.pure-ruby == ' pure Ruby'
+        shell: bash
+        run: echo 'PUMA_PURE_RUBY=true' >> $GITHUB_ENV
 
       - name: Set Rack version, see Gemfile
         shell: bash

@@ -3,6 +3,19 @@
 There are some `cflags` provided to change Puma's default configuration for its
 C extension.
 
+## Skipping the Extension, `PUMA_PURE_RUBY`
+
+Setting the environment variable `PUMA_PURE_RUBY=true` while installing skips
+compiling the extension, so no compiler or OpenSSL headers are needed. The same
+variable must be set when Puma runs, which selects the pure Ruby HTTP parser.
+Puma then has no SSL support.
+
+```
+PUMA_PURE_RUBY=true gem install puma
+```
+
+For Bundler, set the variable for `bundle install` as well as for the server.
+
 ## Query String, `PUMA_QUERY_STRING_MAX_LENGTH`
 
 By default, the max length of `QUERY_STRING` is `1024 * 10`. But you may want to

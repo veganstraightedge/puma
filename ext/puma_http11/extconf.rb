@@ -1,3 +1,14 @@
+# Installing with PUMA_PURE_RUBY=true skips compiling the extension, so no
+# compiler is needed. The same variable must be set at runtime to select the
+# pure Ruby HTTP parser, see lib/puma.rb. The empty library file satisfies
+# rake-compiler, which copies it into lib/puma.
+if ENV['PUMA_PURE_RUBY'] == 'true'
+  require 'rbconfig'
+  File.write('Makefile', "all install::\n")
+  File.write("puma_http11.#{RbConfig::CONFIG['DLEXT']}", '')
+  exit
+end
+
 require 'mkmf'
 
 dir_config("puma_http11")
