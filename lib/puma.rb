@@ -21,12 +21,12 @@ module Puma
 
   # The pure Ruby parser is opt-in with `PUMA_PURE_RUBY=true`.
   # It has no SSL support, since `MiniSSL::Engine` is only provided by the c-extension.
-  def self.pure_http_parser?(env = ENV)
+  def self.ruby_http_parser?(env = ENV)
     env['PUMA_PURE_RUBY'] == 'true'
   end
 end
 
-if Puma.pure_http_parser?
+if Puma.ruby_http_parser?
   require_relative 'puma/http_parser'
   Puma::HTTP_PARSER_ENGINE = 'ruby'
 else
