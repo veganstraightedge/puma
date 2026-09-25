@@ -438,7 +438,7 @@ Puma responds to several signals. A detailed guide to using UNIX signals with Pu
 
 ## Pure Ruby HTTP Parser
 
-Puma parses requests with its `puma_http11` extension, written in C for MRI and Java for JRuby. A pure Ruby parser with the same behavior is included and can be selected with the environment variable `PUMA_PURE_RUBY=true`. It is slower than the extension and has no SSL support, so it is meant for platforms and Ruby implementations where the extension cannot be built or loaded. Setting the same variable when installing the gem skips compiling the extension, see [compile options](docs/compile_options.md). `Puma.http_parser_engine` reports which parser is in use: `"c"`, `"java"`, or `"ruby"`.
+Puma parses requests with its `puma_http11` extension, written in C for MRI and Java for JRuby. A pure Ruby parser with the same behavior is included and can be selected with the environment variable `PUMA_RUBY_HTTP_PARSER=true`. It is slower than the extension and has no SSL support, so it is meant for platforms and Ruby implementations where the extension cannot be built or loaded. Setting the same variable when installing the gem skips compiling the extension, see [compile options](docs/compile_options.md). `Puma.http_parser_engine` reports which parser is in use: `"c"`, `"java"`, or `"ruby"`.
 
 ## Platform Constraints
 

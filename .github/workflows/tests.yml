@@ -110,7 +110,7 @@ jobs:
       - name: Use the pure Ruby HTTP parser, which also skips compiling the extension
         if: matrix.pure-ruby == ' pure Ruby'
         shell: bash
-        run: echo 'PUMA_PURE_RUBY=true' >> $GITHUB_ENV
+        run: echo 'PUMA_RUBY_HTTP_PARSER=true' >> $GITHUB_ENV
 
       - name: Set Rack version, see Gemfile
         shell: bash

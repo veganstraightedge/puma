@@ -3,15 +3,15 @@
 There are some `cflags` provided to change Puma's default configuration for its
 C extension.
 
-## Skipping the Extension, `PUMA_PURE_RUBY`
+## Skipping the Extension, `PUMA_RUBY_HTTP_PARSER`
 
-Setting the environment variable `PUMA_PURE_RUBY=true` while installing skips
+Setting the environment variable `PUMA_RUBY_HTTP_PARSER=true` while installing skips
 compiling the extension, so no compiler or OpenSSL headers are needed. The same
 variable must be set when Puma runs, which selects the pure Ruby HTTP parser.
 Puma then has no SSL support.
 
 ```
-PUMA_PURE_RUBY=true gem install puma
+PUMA_RUBY_HTTP_PARSER=true gem install puma
 ```
 
 For Bundler, set the variable for `bundle install` as well as for the server.

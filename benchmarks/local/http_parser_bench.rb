@@ -5,7 +5,7 @@
 #
 #   bundle exec ruby benchmarks/local/http_parser_bench.rb
 #
-# It runs itself twice as a child process, once with PUMA_PURE_RUBY=true, so
+# It runs itself twice as a child process, once with PUMA_RUBY_HTTP_PARSER=true, so
 # that both parsers are measured in the same Ruby, and prints a comparison
 # table. The children get the JIT the parent runs with, e.g.
 #
@@ -87,7 +87,7 @@ def jit_flags
 end
 
 def run_child(pure_ruby)
-  env = { "PUMA_PURE_RUBY" => pure_ruby ? "true" : nil }
+  env = { "PUMA_RUBY_HTTP_PARSER" => pure_ruby ? "true" : nil }
   output = IO.popen([env, RbConfig.ruby, *jit_flags, "-Ilib", __FILE__, "--measure"], &:read)
   JSON.parse(output)
 end
