@@ -34,9 +34,14 @@ else
     # use require, see https://github.com/puma/puma/pull/2381
     require 'puma/puma_http11'
   rescue LoadError => e
-    raise LoadError, "#{e.message}\nPuma's puma_http11 extension is not available. " \
-      "Reinstall the gem with a compiler, or set PUMA_RUBY_HTTP_PARSER=true to use the Ruby HTTP parser."
+    raise LoadError, <<~MSG
+      #{e.message}
+      Puma's puma_http11 extension is not available.
+      Reinstall the gem with a compiler, or set
+      PUMA_RUBY_HTTP_PARSER=true to use the Ruby HTTP parser.
+    MSG
   end
+
   Puma::HTTP_PARSER_ENGINE = Puma.jruby? ? 'java' : 'c'
 end
 
