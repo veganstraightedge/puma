@@ -12,9 +12,9 @@ require_relative 'puma/detect'
 
 module Puma
   # The HTTP parser implementation, one of the following (as a string):
-  # * c: the puma_http11 C extension, the default on MRI
+  # * c:    the puma_http11 C extension, the default on MRI
   # * java: the puma_http11 Java extension, the default on JRuby
-  # * ruby: written in Ruby, see `puma/http_parser`
+  # * ruby: the puma/http_parser written in Ruby
   def self.http_parser_engine
     HTTP_PARSER_ENGINE
   end
