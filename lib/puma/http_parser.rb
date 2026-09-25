@@ -45,6 +45,22 @@ module Puma
     # (any -- CTL) | "\t"
     FIELD_VALUE_BYTE = Array.new(256) { |byte| byte == TAB || !CONTROL_BYTES.include?(byte) }.freeze
 
+    # The first byte that ends a run of each class above, so that a run can be
+    # skipped with one String#index call instead of a Ruby loop over each byte.
+    # Each must agree with its table; test_http11.rb checks that.
+    METHOD_RUN_END = /[^A-Z0-9$\-_.]/n
+    SCHEME_RUN_END = /[^A-Za-z0-9+\-.]/n
+    URI_RUN_END = /[\x00-\x20"#<>\x7f]/n
+    PATH_RUN_END = /[\x00-\x20"#<>?\x7f]/n
+    FIELD_NAME_RUN_END = /[^!#$%&'*+\-.0-9A-Z^_`a-z|~]/n
+    FIELD_VALUE_RUN_END = /[\x00-\x08\x0a-\x1f\x7f]/n
+
+    # A complete header line, using the same byte classes as FIELD_NAME_BYTE
+    # and FIELD_VALUE_BYTE, so that a whole line can be handled in one match.
+    # Lines that don't match, because they are incomplete or invalid, take the
+    # byte by byte path through the states below.
+    HEADER_LINE = /\G([!#$%&'*+\-.0-9A-Z^_`a-z|~]+): *([^\x00-\x08\x0a-\x1f\x7f]*)\r\n/n
+
     METHOD_MAX_LENGTH = 20
     PROTOCOL_PREFIX = "HTTP/"
     HTTP_PREFIX = "HTTP_"
@@ -171,7 +187,7 @@ module Puma
 
       @env = env
       # Operate on bytes, like the C extension does.
-      @data = data.b
+      @data = data.encoding == Encoding::BINARY ? data : data.b
       stopped_at = run(start, @data.bytesize)
       @nread += stopped_at - start
 
@@ -195,9 +211,12 @@ module Puma
 
         case state
         when :method
-          if METHOD_BYTE[byte] && position - @mark < METHOD_MAX_LENGTH
-            # continue
-          elsif byte == SPACE && position > @mark
+          if METHOD_BYTE[byte]
+            position = [end_of_run(METHOD_RUN_END, position), @mark + METHOD_MAX_LENGTH].min
+            break if position == to
+            byte = @data.getbyte(position)
+          end
+          if byte == SPACE && position > @mark
             request_method(position)
             state = :uri_start
           else
@@ -227,8 +246,11 @@ module Puma
           end
         when :scheme
           if SCHEME_BYTE[byte]
-            # continue
-          elsif byte == COLON
+            position = end_of_run(SCHEME_RUN_END, position)
+            break if position == to
+            byte = @data.getbyte(position)
+          end
+          if byte == COLON
             state = :absolute_uri
           else
             state = :error
@@ -236,8 +258,11 @@ module Puma
           end
         when :absolute_uri
           if URI_BYTE[byte]
-            # continue
-          elsif byte == SPACE
+            position = end_of_run(URI_RUN_END, position)
+            break if position == to
+            byte = @data.getbyte(position)
+          end
+          if byte == SPACE
             request_uri(position)
             state = :protocol_start
           elsif byte == HASH
@@ -249,8 +274,11 @@ module Puma
           end
         when :path
           if PATH_BYTE[byte]
-            # continue
-          elsif byte == QUESTION
+            position = end_of_run(PATH_RUN_END, position)
+            break if position == to
+            byte = @data.getbyte(position)
+          end
+          if byte == QUESTION
             request_path(position)
             @query_start = position + 1
             state = :query
@@ -268,8 +296,11 @@ module Puma
           end
         when :query
           if URI_BYTE[byte]
-            # continue
-          elsif byte == SPACE
+            position = end_of_run(URI_RUN_END, position)
+            break if position == to
+            byte = @data.getbyte(position)
+          end
+          if byte == SPACE
             query_string(position)
             request_uri(position)
             state = :protocol_start
@@ -294,8 +325,11 @@ module Puma
           end
         when :fragment
           if URI_BYTE[byte]
-            # continue
-          elsif byte == SPACE
+            position = end_of_run(URI_RUN_END, position)
+            break if position == to
+            byte = @data.getbyte(position)
+          end
+          if byte == SPACE
             fragment(position)
             state = :protocol_start
           else
@@ -361,6 +395,14 @@ module Puma
           if byte == CR
             state = :final_lf
           elsif FIELD_NAME_BYTE[byte]
+            if (line = HEADER_LINE.match(@data, position))
+              @field_start = position
+              @field_len = line.end(1) - position
+              @mark = line.begin(2)
+              http_field(line.end(2))
+              position = line.end(0)
+              next
+            end
             @field_start = position
             state = :field_name
           else
@@ -369,8 +411,11 @@ module Puma
           end
         when :field_name
           if FIELD_NAME_BYTE[byte]
-            # continue
-          elsif byte == COLON
+            position = end_of_run(FIELD_NAME_RUN_END, position)
+            break if position == to
+            byte = @data.getbyte(position)
+          end
+          if byte == COLON
             @field_len = position - @field_start
             state = :field_value_start
           else
@@ -393,8 +438,11 @@ module Puma
           end
         when :field_value
           if FIELD_VALUE_BYTE[byte]
-            # continue
-          elsif byte == CR
+            position = end_of_run(FIELD_VALUE_RUN_END, position)
+            break if position == to
+            byte = @data.getbyte(position)
+          end
+          if byte == CR
             http_field(position)
             state = :header_lf
           else
@@ -432,6 +480,12 @@ module Puma
       position
     end
 
+    # The byte at `position` is known to be in the run. Returns the position of
+    # the first byte after the run, or the end of the data.
+    def end_of_run(run_end, position)
+      @data.index(run_end, position + 1) || @data.bytesize
+    end
+
     def validate_max_length(length, max_length, message)
       raise HttpParserError, format(message, length) if length > max_length
     end
@@ -443,7 +497,9 @@ module Puma
 
       # Upcase, "-" becomes "_", and "_" becomes "," so that a header with
       # underscores cannot impersonate one with dashes.
-      name = @data.byteslice(@field_start, @field_len).upcase.tr("-_", "_,")
+      name = @data.byteslice(@field_start, @field_len)
+      name.upcase!
+      name.tr!("-_", "_,")
       key = COMMON_FIELDS[name] || -"#{HTTP_PREFIX}#{name}"
 
       value = @data.byteslice(@mark, value_length)

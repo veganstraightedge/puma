@@ -437,6 +437,46 @@ class Http11ParserTest < TestIntegration
     assert_raises(Puma::HttpParserError) { parser.execute({}, "#{'A' * 21} / HTTP/1.1\r\n\r\n", 0) }
   end
 
+  def test_run_end_regexps_agree_with_byte_tables
+    skip "pure Ruby parser only" if Puma::HAS_NATIVE_HTTP_PARSER
+    parser = Puma::HttpParser
+
+    {
+      parser::METHOD_BYTE => parser::METHOD_RUN_END,
+      parser::SCHEME_BYTE => parser::SCHEME_RUN_END,
+      parser::URI_BYTE => parser::URI_RUN_END,
+      parser::PATH_BYTE => parser::PATH_RUN_END,
+      parser::FIELD_NAME_BYTE => parser::FIELD_NAME_RUN_END,
+      parser::FIELD_VALUE_BYTE => parser::FIELD_VALUE_RUN_END
+    }.each do |table, run_end|
+      256.times do |byte|
+        assert_equal table[byte], !run_end.match?(byte.chr.b), "#{run_end.inspect} byte #{byte}"
+      end
+    end
+  end
+
+  # The one-match header line path must be exactly as strict as the byte tables,
+  # since only lines it rejects reach the byte by byte path.
+  def test_header_line_regexp_agrees_with_byte_tables
+    skip "pure Ruby parser only" if Puma::HAS_NATIVE_HTTP_PARSER
+    parser = Puma::HttpParser
+
+    256.times do |byte|
+      in_name = "#{byte.chr}: v\r\n".b
+      assert_equal parser::FIELD_NAME_BYTE[byte], parser::HEADER_LINE.match?(in_name), "name byte #{byte}"
+
+      in_value = "X: a#{byte.chr}b\r\n".b
+      assert_equal parser::FIELD_VALUE_BYTE[byte], parser::HEADER_LINE.match?(in_value), "value byte #{byte}"
+    end
+
+    assert parser::HEADER_LINE.match?("X:\r\n".b)
+    assert parser::HEADER_LINE.match?("X:   \tv \r\n".b)
+    refute parser::HEADER_LINE.match?("X : v\r\n".b)
+    refute parser::HEADER_LINE.match?(": v\r\n".b)
+    refute parser::HEADER_LINE.match?("X: v\n".b)
+    refute parser::HEADER_LINE.match?("X: v\r\n".b, 1)
+  end
+
   def test_rejects_lowercase_method_and_bare_word_uri
     ["get / HTTP/1.1\r\n\r\n", "GET abc HTTP/1.1\r\n\r\n", "GET  / HTTP/1.1\r\n\r\n", "GET / HTTP/1.\r\n\r\n"].each do |http|
       parser = Puma::HttpParser.new
