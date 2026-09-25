@@ -1,7 +1,6 @@
-# Installing with PUMA_RUBY_HTTP_PARSER=true skips compiling the extension, so no
-# compiler is needed. The same variable must be set at runtime to select the
-# Ruby HTTP parser, see lib/puma.rb. The empty library file satisfies
-# rake-compiler, which copies it into lib/puma.
+# Installing with `PUMA_RUBY_HTTP_PARSER=true` skips compiling the extension, so no compiler is needed.
+# The same variable must be set at runtime to select the Ruby HTTP parser, see lib/puma.rb.
+# The empty library file satisfies rake-compiler, which copies it into lib/puma.
 if ENV['PUMA_RUBY_HTTP_PARSER'] == 'true'
   require 'rbconfig'
   File.write('Makefile', "all install::\n")
