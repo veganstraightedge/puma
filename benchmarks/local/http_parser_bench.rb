@@ -16,37 +16,48 @@ require "rbconfig"
 
 ITERATIONS = Integer(ENV.fetch("ITERATIONS", 200_000))
 
+# HTTP requires CRLF line endings, so each heredoc's newlines are converted.
+MINIMAL_GET = <<~HTTP.gsub("\n", "\r\n")
+  GET / HTTP/1.1
+  Host: localhost
+
+HTTP
+
+BROWSER_GET = <<~HTTP.gsub("\n", "\r\n")
+  GET /articles/2026/09/hello-world?utm_source=news&ref=home HTTP/1.1
+  Host: www.example.com
+  User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36
+  Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+  Accept-Language: en-US,en;q=0.9
+  Accept-Encoding: gzip, deflate, br
+  Connection: keep-alive
+  Cookie: session=abc123def456; theme=dark; consent=1
+  Cache-Control: max-age=0
+  Upgrade-Insecure-Requests: 1
+  Sec-Fetch-Dest: document
+  Sec-Fetch-Mode: navigate
+  Sec-Fetch-Site: none
+
+HTTP
+
+# The body has no trailing newline, hence the chomp.
+API_POST = <<~HTTP.chomp.gsub("\n", "\r\n")
+  POST /api/v1/orders HTTP/1.1
+  Host: api.example.com
+  Content-Type: application/json
+  Content-Length: 27
+  Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U
+  Accept: application/json
+  X-Request-Id: 7f1c0e3a-1c2b-4d5e-8f90-123456789abc
+  User-Agent: curl/8.7.1
+
+  {"sku":"A1","quantity":2}
+HTTP
+
 REQUESTS = {
-  "minimal GET" =>
-    "GET / HTTP/1.1\r\n" \
-    "Host: localhost\r\n" \
-    "\r\n",
-  "browser GET" =>
-    "GET /articles/2026/09/hello-world?utm_source=news&ref=home HTTP/1.1\r\n" \
-    "Host: www.example.com\r\n" \
-    "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36\r\n" \
-    "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\r\n" \
-    "Accept-Language: en-US,en;q=0.9\r\n" \
-    "Accept-Encoding: gzip, deflate, br\r\n" \
-    "Connection: keep-alive\r\n" \
-    "Cookie: session=abc123def456; theme=dark; consent=1\r\n" \
-    "Cache-Control: max-age=0\r\n" \
-    "Upgrade-Insecure-Requests: 1\r\n" \
-    "Sec-Fetch-Dest: document\r\n" \
-    "Sec-Fetch-Mode: navigate\r\n" \
-    "Sec-Fetch-Site: none\r\n" \
-    "\r\n",
-  "API POST" =>
-    "POST /api/v1/orders HTTP/1.1\r\n" \
-    "Host: api.example.com\r\n" \
-    "Content-Type: application/json\r\n" \
-    "Content-Length: 27\r\n" \
-    "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U\r\n" \
-    "Accept: application/json\r\n" \
-    "X-Request-Id: 7f1c0e3a-1c2b-4d5e-8f90-123456789abc\r\n" \
-    "User-Agent: curl/8.7.1\r\n" \
-    "\r\n" \
-    "{\"sku\":\"A1\",\"quantity\":2}"
+  "minimal GET" => MINIMAL_GET,
+  "browser GET" => BROWSER_GET,
+  "API POST"    => API_POST
 }.freeze
 
 # Parses each request ITERATIONS times with whichever HttpParser
