@@ -74,7 +74,7 @@ def measure
   end
 
   {
-    "parser" => Puma::HAS_NATIVE_HTTP_PARSER ? "puma_http11" : "pure Ruby",
+    "parser" => Puma.ruby_http_parser? ? "pure Ruby" : "puma_http11",
     "microseconds" => microseconds
   }
 end
