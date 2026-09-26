@@ -4,11 +4,11 @@ Puma parses requests with `Puma::HttpParser`, which comes from its `puma_http11`
 
 ```ruby
 # config/puma.rb
-require "puma/http"
-http_parser Puma::HTTP::Parser
+require "puma/http1"
+http_parser Puma::HTTP1::Parser
 ```
 
-The class must be required before it is passed to `http_parser`. Puma does not search for parsers.
+That example uses [puma-http1](https://github.com/veganstraightedge/puma-http1), a Ruby port of `Puma::HttpParser`. The class must be required before it is passed to `http_parser`. Puma does not search for parsers.
 
 A parser gem shouldn't define a constant directly under `Puma` with the same name as one in `Puma::Const`, such as `Puma::HTTP`. Puma's code refers to those constants without the `Const::` prefix, and Ruby finds a constant defined directly under `Puma` first.
 

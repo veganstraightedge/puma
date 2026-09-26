@@ -1569,8 +1569,8 @@ module Puma
     # The default is +nil+, which uses `Puma::HttpParser`.
     #
     # @example
-    #   require "puma/http"
-    #   http_parser Puma::HTTP::Parser
+    #   require "puma/http1"
+    #   http_parser Puma::HTTP1::Parser
     #
     def http_parser(parser_class)
       @options[:http_parser] = parser_class
