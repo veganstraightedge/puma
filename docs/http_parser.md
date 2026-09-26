@@ -10,6 +10,8 @@ http_parser Puma::HTTP::Parser
 
 The class must be required before it is passed to `http_parser`. Puma does not search for parsers.
 
+A parser gem shouldn't define a constant directly under `Puma` with the same name as one in `Puma::Const`, such as `Puma::HTTP`. Puma's code refers to those constants without the `Const::` prefix, and Ruby finds a constant defined directly under `Puma` first.
+
 ## Without the extension
 
 Puma loads when `puma_http11` can't be built or loaded. There is then no default parser, so a server raises a `LoadError` at startup unless `http_parser` is set. SSL is also unavailable, because `MiniSSL::Engine` lives in the same extension.
