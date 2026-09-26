@@ -81,14 +81,14 @@ module Puma
 
     attr_accessor :remote_addr_header, :listener, :env_set_http_version
 
-    def initialize(io, env=nil)
+    def initialize(io, env=nil, http_parser: HttpParser)
       @io = io
       @to_io = io.to_io
       @io_buffer = IOBuffer.new
       @proto_env = env
       @env = env&.dup
 
-      @parser = HttpParser.new
+      @parser = http_parser.new
       @parsed_bytes = 0
       @read_header = true
       @read_proxy = false

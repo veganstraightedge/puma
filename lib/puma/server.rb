@@ -107,6 +107,7 @@ module Puma
       @enable_keep_alives      &&= @queue_requests
       @io_selector_backend       = @options[:io_selector_backend]
       @http_content_length_limit = @options[:http_content_length_limit]
+      @http_parser               = @options[:http_parser] || HttpParser
       @allow_underscore_headers  = @options.fetch(:allow_underscore_headers, true)
       @cluster_accept_loop_delay = ClusterAcceptLoopDelay.new(
         workers: @options[:workers],
@@ -451,7 +452,7 @@ module Puma
 
     # :nodoc:
     def new_client(io, sock)
-      client = Client.new(io, @binder.env(sock))
+      client = Client.new(io, @binder.env(sock), http_parser: @http_parser)
       client.listener = sock
       client.env_set_http_version = @env_set_http_version
       client.http_content_length_limit = @http_content_length_limit
