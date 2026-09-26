@@ -3,6 +3,7 @@
 require_relative 'detect'
 require_relative 'io_buffer'
 require_relative 'client_env'
+require_relative 'http_parser_error'
 require 'tempfile'
 
 if Puma::IS_JRUBY
