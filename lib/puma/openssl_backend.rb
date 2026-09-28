@@ -56,6 +56,9 @@ module Puma
     # Wraps an +OpenSSL::SSL::SSLSocket+ with the interface Puma uses from
     # +Puma::MiniSSL::Socket+, raising +Puma::MiniSSL::SSLError+ for SSL errors.
     class Socket
+      # The most a TLS record holds, so the most one read returns.
+      MAX_RECORD_SIZE = 16_384
+
       def initialize(ssl_socket)
         @ssl_socket = ssl_socket
         @ssl_socket.sync = true
@@ -95,6 +98,10 @@ module Puma
       # return more than +size+, see #read_pending.
       def read_nonblock(size, buffer = nil, exception: true)
         return wait_readable(exception) unless handshake_complete?
+
+        # SSLSocket#read_nonblock allocates +size+ bytes before it reads, even
+        # when there's nothing to read, and one read returns at most one record.
+        size = MAX_RECORD_SIZE if size > MAX_RECORD_SIZE
 
         loop do
           data = translate_ssl_errors { @ssl_socket.read_nonblock(size, buffer, exception: false) }
