@@ -10,6 +10,9 @@ if ::Puma::HAS_SSL
   require "puma/minissl"
   require_relative "helpers/test_puma/puma_socket"
 
+  # The SSL backend these tests run against, set the same way as for `puma`.
+  SSL_BACKEND = (ENV['PUMA_SSL_BACKEND'] || 'minissl').to_sym
+
   if ENV['PUMA_TEST_DEBUG']
     require "openssl" unless Object.const_defined? :OpenSSL
     if Puma::IS_JRUBY
@@ -64,7 +67,7 @@ class TestPumaServerSSL < PumaTest
     @log_stdout = StringIO.new
     @log_stderr = StringIO.new
     @log_writer = SSLLogWriterHelper.new @log_stdout, @log_stderr
-    @server = Puma::Server.new app, nil, {log_writer: @log_writer}.merge(server_options)
+    @server = Puma::Server.new app, nil, {log_writer: @log_writer, ssl_backend: SSL_BACKEND}.merge(server_options)
     @port = (@server.add_ssl_listener HOST, 0, ctx).addr[1]
     @bind_port = @port
     @server.run
@@ -450,7 +453,7 @@ class TestPumaServerSSLClient < PumaTest
     app = lambda { |env| [200, {}, [env['rack.url_scheme']]] }
 
     log_writer = SSLLogWriterHelper.new STDOUT, STDERR
-    server = Puma::Server.new app, nil, {log_writer: log_writer}
+    server = Puma::Server.new app, nil, {log_writer: log_writer, ssl_backend: SSL_BACKEND}
     server.add_ssl_listener LOCALHOST, port, context
     host_addrs = server.binder.ios.map { |io| io.to_io.addr[2] }
     @bind_port = server.connected_ports[0]
@@ -685,7 +688,7 @@ class TestPumaServerSSLClientCloseError < PumaTest
 
   def assert_ssl_client_error_match(close_error, log_writer: SSLLogWriterHelper.new(STDOUT, STDERR), &blk)
     app = lambda { |env| [200, {}, [env['rack.url_scheme']]] }
-    server = Puma::Server.new app, nil, {log_writer: log_writer}
+    server = Puma::Server.new app, nil, {log_writer: log_writer, ssl_backend: SSL_BACKEND}
     server.add_ssl_listener LOCALHOST, 0, CTX
 
     @bind_port = server.connected_ports[0]
@@ -750,7 +753,7 @@ class TestPumaServerSSLWithCertPemAndKeyPem < PumaTest
 
     app = lambda { |env| [200, {}, [env['rack.url_scheme']]] }
     log_writer = SSLLogWriterHelper.new STDOUT, STDERR
-    server = Puma::Server.new app, nil, {log_writer: log_writer}
+    server = Puma::Server.new app, nil, {log_writer: log_writer, ssl_backend: SSL_BACKEND}
     server.add_ssl_listener LOCALHOST, 0, ctx
     @bind_port = server.connected_ports[0]
     server.run
@@ -794,7 +797,7 @@ class TestPumaSSLCertChain < PumaTest
     @log_stdout = StringIO.new
     @log_stderr = StringIO.new
     @log_writer = SSLLogWriterHelper.new @log_stdout, @log_stderr
-    @server = Puma::Server.new app, nil, {log_writer: @log_writer}
+    @server = Puma::Server.new app, nil, {log_writer: @log_writer, ssl_backend: SSL_BACKEND}
 
     mini_ctx = Puma::MiniSSL::Context.new
     mini_ctx.key  = "#{CHAIN_DIR}/cert.key"

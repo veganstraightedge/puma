@@ -517,6 +517,66 @@ class TestBinderSingle < TestBinderBase
   end
 end
 
+class TestBinderSSLBackend < TestBinderBase
+  parallelize_me!
+
+  def test_ssl_backend_minissl
+    skip_unless :ssl
+    binder = binder_with_ssl_backend :minissl
+    binder.parse ["ssl://127.0.0.1:0?#{ssl_query}"], @log_writer
+
+    assert_instance_of Puma::MiniSSL::Server, binder.ios.first
+  ensure
+    binder&.close
+  end
+
+  def test_ssl_backend_openssl
+    skip_unless :ssl
+    skip_if :jruby
+    binder = binder_with_ssl_backend :openssl
+    binder.parse ["ssl://127.0.0.1:0?#{ssl_query}"], @log_writer
+
+    assert_instance_of Puma::OpenSSLBackend::Server, binder.ios.first
+  ensure
+    binder&.close
+  end
+
+  def test_ssl_backend_openssl_on_jruby_raises
+    skip_unless :ssl
+    skip_unless :jruby
+    binder = binder_with_ssl_backend :openssl
+
+    error = assert_raises(ArgumentError) do
+      binder.parse ["ssl://127.0.0.1:0?#{ssl_query}"], @log_writer
+    end
+    assert_includes error.message, "JRuby"
+  ensure
+    binder&.close
+  end
+
+  def test_ssl_backend_unknown_raises
+    skip_unless :ssl
+    options = Puma::Configuration.new.tap(&:clamp).options
+    options[:ssl_backend] = :gnutls
+    binder = Puma::Binder.new(@log_writer, options)
+
+    error = assert_raises(ArgumentError) do
+      binder.parse ["ssl://127.0.0.1:0?#{ssl_query}"], @log_writer
+    end
+    assert_includes error.message, ":gnutls"
+  ensure
+    binder&.close
+  end
+
+  private
+
+  def binder_with_ssl_backend(backend)
+    config = Puma::Configuration.new { |c| c.ssl_backend backend }
+    config.clamp
+    Puma::Binder.new(@log_writer, config.options)
+  end
+end
+
 class TestBinderJRuby < TestBinderBase
   def test_binder_parses_jruby_ssl_options
     skip_unless :ssl

@@ -7,6 +7,15 @@ module Puma
     class ContextBuilder
       DEFAULT_CIPHER_FILTER = "HIGH:!aNULL@STRENGTH"
 
+      # The thread local where the verify callback stores a certificate that
+      # fails verification, for +Puma::OpenSSLBackend::Socket#peercert+.
+      FAILED_PEERCERT_KEY = :puma_openssl_backend_failed_peercert
+
+      VERIFY_CALLBACK = lambda do |ok, store_context|
+        Thread.current[FAILED_PEERCERT_KEY] = store_context.current_cert unless ok
+        ok
+      end
+
       def initialize(ctx)
         @ctx = ctx
       end
@@ -18,6 +27,7 @@ module Puma
         add_certificate ssl_context
         ssl_context.cert_store = cert_store if @ctx.ca || @ctx.verification_flags
         ssl_context.verify_mode = @ctx.verify_mode || OpenSSL::SSL::VERIFY_NONE
+        ssl_context.verify_callback = VERIFY_CALLBACK if @ctx.verify_mode
         ssl_context.min_version = min_version
         ssl_context.ciphers = @ctx.ssl_cipher_filter || DEFAULT_CIPHER_FILTER
         ssl_context.ciphersuites = @ctx.ssl_ciphersuites if @ctx.ssl_ciphersuites

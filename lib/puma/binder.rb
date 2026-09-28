@@ -366,6 +366,7 @@ module Puma
       raise "Puma compiled without SSL support" unless HAS_SSL
       # Puma will try to use local authority context if context is supplied nil
       ctx ||= localhost_authority_context
+      server_class = ssl_server_class
 
       if host == "localhost"
         loopback_addresses.each do |addr|
@@ -382,7 +383,7 @@ module Puma
       s.setsockopt(Socket::SOL_SOCKET,Socket::SO_REUSEADDR, true)
       s.listen backlog
 
-      ssl = MiniSSL::Server.new s, ctx
+      ssl = server_class.new s, ctx
       env = @proto_env.dup
       env[HTTPS_KEY] = HTTPS
       @envs[ssl] = env
@@ -395,10 +396,11 @@ module Puma
       raise "Puma compiled without SSL support" unless HAS_SSL
       # Puma will try to use local authority context if context is supplied nil
       ctx ||= localhost_authority_context
+      server_class = ssl_server_class
 
       s = fd.kind_of?(::TCPServer) ? fd : ::TCPServer.for_fd(fd)
 
-      ssl = MiniSSL::Server.new(s, ctx)
+      ssl = server_class.new(s, ctx)
 
       env = @proto_env.dup
       env[HTTPS_KEY] = HTTPS
@@ -506,6 +508,22 @@ module Puma
     # @version 5.0.0
     def socket_activation_fd(int)
       int + 3 # 3 is the magic number you add to follow the SA protocol
+    end
+
+    # The class that wraps SSL listeners, chosen by the +ssl_backend+ option.
+    def ssl_server_class
+      backend = @options[:ssl_backend] || :minissl
+
+      case backend
+      when :minissl then MiniSSL::Server
+      when :openssl
+        raise ArgumentError, "ssl_backend :openssl is not available on JRuby" if IS_JRUBY
+
+        require_relative 'openssl_backend'
+        OpenSSLBackend::Server
+      else
+        raise ArgumentError, "Unknown ssl_backend #{backend.inspect}, expected :minissl or :openssl"
+      end
     end
   end
 end
