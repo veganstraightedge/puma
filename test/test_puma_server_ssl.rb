@@ -267,6 +267,25 @@ class TestPumaServerSSL < PumaTest
     assert_match %r{/first.*/second}m, responses
   end
 
+  # The end of a request body and a pipelined request, sent in one TLS record
+  # after the start of the body, are both read.
+  def test_pipelined_request_after_body_end_in_one_tls_record
+    skip_if :jruby # closes without close_notify, see #4029
+    start_server
+    @server.app = proc { |env| [200, {}, ["#{env['PATH_INFO']}:#{env['rack.input'].read}"]] }
+
+    skt = new_socket ctx: new_ctx
+    skt.syswrite "POST /first HTTP/1.1\r\nHost: test.com\r\nContent-Length: 10\r\n\r\n01234"
+    sleep 0.5
+    skt.syswrite "56789GET /second HTTP/1.1\r\nHost: test.com\r\nConnection: close\r\n\r\n"
+
+    responses = +''
+    responses << skt.readpartial(16_384) until responses.end_with?('/second:')
+
+    assert_equal 2, responses.scan('HTTP/1.1 200 OK').size
+    assert_includes responses, '/first:0123456789HTTP/1.1'
+  end
+
   def test_full_hijack
     start_server
     @server.app = proc do |env|

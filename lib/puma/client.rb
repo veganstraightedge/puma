@@ -562,12 +562,20 @@ module Puma
           raise EOFError
         end
 
+        # An SSL socket can return more than was asked for, when a pipelined
+        # request follows the body in the same TLS record. Keep the extra for
+        # the next request.
+        if chunk.bytesize > remain
+          next_request = chunk.byteslice(remain..-1)
+          chunk = chunk.byteslice(0, remain)
+        end
+
         remain -= @body.write(chunk)
       end
 
       if remain <= 0
         @body.rewind
-        @buffer = nil
+        @buffer = next_request
         set_ready
         true
       else
