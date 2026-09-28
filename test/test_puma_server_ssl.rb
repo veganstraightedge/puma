@@ -223,6 +223,92 @@ class TestPumaServerSSL < PumaTest
     assert_empty @log_stderr.string
   end
 
+  def test_tls_v1_2
+    start_server
+
+    skt = send_http ctx: new_ctx { |c| c.max_version = :TLS1_2 }
+
+    assert_equal 'https', skt.read_response.body
+    assert_equal 'TLSv1.2', skt.ssl_version
+  end
+
+  # A request body sent in many TLS records, each read by the server
+  # as it arrives, is read in full.
+  def test_large_request_body_in_many_tls_records
+    start_server
+    @server.app = proc { |env| [200, {}, [env['rack.input'].read.bytesize.to_s]] }
+
+    body = "x" * (1_024 * 1_024)
+    skt = new_socket ctx: new_ctx
+    skt.write "POST / HTTP/1.1\r\nHost: test.com\r\nContent-Length: #{body.bytesize}\r\n\r\n"
+    body.each_char.each_slice(16 * 1_024) { |chunk| skt.write chunk.join }
+
+    assert_equal body.bytesize.to_s, skt.read_response.body
+  end
+
+  # Two requests sent in one TLS record are both answered, even though
+  # the second may already be decrypted when the first is handled.
+  def test_pipelined_requests_in_one_tls_record
+    start_server
+    @server.app = proc { |env| [200, {}, [env['PATH_INFO']]] }
+
+    requests = "GET /first HTTP/1.1\r\nHost: test.com\r\n\r\n" \
+      "GET /second HTTP/1.1\r\nHost: test.com\r\nConnection: close\r\n\r\n"
+    skt = new_socket ctx: new_ctx
+    skt.syswrite requests
+
+    responses = skt.read
+
+    assert_equal 2, responses.scan('HTTP/1.1 200 OK').size
+    assert_match %r{/first.*/second}m, responses
+  end
+
+  def test_full_hijack
+    start_server
+    @server.app = proc do |env|
+      io = env['rack.hijack'].call
+      io.write "HTTP/1.1 200 OK\r\nContent-Length: 8\r\nConnection: close\r\n\r\nhijacked"
+      io.close
+      [-1, {}, []]
+    end
+
+    assert_equal 'hijacked', send_http_read_resp_body(ctx: new_ctx)
+  end
+
+  # The C extension sends close_notify when it closes a connection, so an
+  # OpenSSL client reads a clean end of stream. Puma's Java extension
+  # doesn't yet, see https://github.com/puma/puma/issues/4029
+  def test_close_notify_on_connection_close
+    skip_if :jruby
+    start_server
+
+    skt = send_http "GET / HTTP/1.1\r\nHost: test.com\r\nConnection: close\r\n\r\n", ctx: new_ctx
+
+    received = +""
+    loop { received << skt.sysread(16_384) }
+  rescue EOFError
+    assert_match(/https\z/, received)
+  end
+
+  # The TLS handshake happens while Puma waits for the first data of a
+  # request, so a client that never starts it is closed at
+  # first_data_timeout.
+  def test_stalled_handshake_closed_at_first_data_timeout
+    start_server first_data_timeout: 1
+
+    skt = TCPSocket.new HOST, @bind_port
+    started_at = Process.clock_gettime Process::CLOCK_MONOTONIC
+    readable = skt.wait_readable 5
+    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at
+
+    assert readable, "Puma didn't close the connection"
+    assert_nil skt.read_nonblock(1, exception: false)
+    assert_operator elapsed, :>=, 0.9
+    assert_operator elapsed, :<, 4
+  ensure
+    skt&.close
+  end
+
   unless Puma.jruby?
     def test_invalid_cert
       assert_raises(Puma::MiniSSL::SSLError) do
