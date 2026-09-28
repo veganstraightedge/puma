@@ -69,7 +69,7 @@ jobs:
           - { os: ubuntu-22.04    , ruby:  head , yjit: ' yjit'     }
           - { os: ubuntu-22.04    , ruby:  3.2  , no-ssl: ' no SSL' }
           - { os: ubuntu-22.04    , ruby: '3.0' , rack-v: ' rack2'  }
-          - { os: ubuntu-24.04    , ruby:  3.1  , ssl-backend: ' openssl' }
+          - { os: ubuntu-24.04    , ruby:  3.2  , ssl-backend: ' openssl' }
           - { os: ubuntu-24.04    , ruby:  3.4  , ssl-backend: ' openssl' }
           - { os: ubuntu-24.04    , ruby: '4.0' , ssl-backend: ' openssl' }
           - { os: ubuntu-24.04    , ruby:  head , ssl-backend: ' openssl' }

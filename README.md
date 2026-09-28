@@ -388,8 +388,8 @@ is not encrypted, the executable will not be called.
 
 By default, Puma handles SSL with its own extension, MiniSSL. An experimental
 backend built on Ruby's `openssl` library takes the same `ssl_bind` options (not
-available for JRuby). It requires openssl gem 3.0 or later, which comes with
-Ruby 3.1 and later. On Ruby 3.0, add `gem "openssl"` to your Gemfile.
+available for JRuby). It requires openssl gem 3.1 or later, which comes with
+Ruby 3.2 and later. On older Rubies, add `gem "openssl"` to your Gemfile.
 
 Choose it in your config file:
 

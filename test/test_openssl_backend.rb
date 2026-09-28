@@ -3,8 +3,15 @@
 require_relative "helper"
 
 if ::Puma::HAS_SSL && !::Puma::IS_JRUBY
-  require "puma/minissl"
-  require "puma/openssl_backend"
+  require "openssl"
+
+  # The backend raises a LoadError on older openssl gems.
+  OPENSSL_BACKEND_AVAILABLE = Gem::Version.new(OpenSSL::VERSION) >= Gem::Version.new("3.1")
+
+  if OPENSSL_BACKEND_AVAILABLE
+    require "puma/minissl"
+    require "puma/openssl_backend"
+  end
 end
 
 class TestOpenSSLBackendContextBuilder < PumaTest
@@ -155,4 +162,4 @@ class TestOpenSSLBackendContextBuilder < PumaTest
   def tls_1_3_cipher_names
     OpenSSL::SSL::SSLContext.new.ciphers.map(&:first).select { |name| name.start_with? "TLS_" }
   end
-end if ::Puma::HAS_SSL && !::Puma::IS_JRUBY
+end if ::Puma::HAS_SSL && !::Puma::IS_JRUBY && OPENSSL_BACKEND_AVAILABLE

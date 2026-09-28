@@ -7,7 +7,7 @@ module Puma
   # the +ssl_backend :openssl+ option. It takes the same +Puma::MiniSSL::Context+
   # as MiniSSL, so SSL settings work the same with either backend.
   module OpenSSLBackend
-    MINIMUM_OPENSSL_GEM_VERSION = "3.0"
+    MINIMUM_OPENSSL_GEM_VERSION = "3.1"
 
     if Gem::Version.new(OpenSSL::VERSION) < Gem::Version.new(MINIMUM_OPENSSL_GEM_VERSION)
       raise LoadError, "Puma's openssl SSL backend requires openssl gem #{MINIMUM_OPENSSL_GEM_VERSION} " \

@@ -533,6 +533,8 @@ class TestBinderSSLBackend < TestBinderBase
   def test_ssl_backend_openssl
     skip_unless :ssl
     skip_if :jruby
+    require "openssl"
+    skip "requires openssl gem 3.1 or later" if Gem::Version.new(OpenSSL::VERSION) < Gem::Version.new("3.1")
     binder = binder_with_ssl_backend :openssl
     binder.parse ["ssl://127.0.0.1:0?#{ssl_query}"], @log_writer
 

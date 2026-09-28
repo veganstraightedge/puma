@@ -1538,7 +1538,7 @@ module Puma
     # Specify the backend for SSL connections.
     #
     # +:minissl+ uses Puma's own extension. +:openssl+ uses Ruby's openssl
-    # library, and is experimental. It requires openssl gem 3.0 or later, and
+    # library, and is experimental. It requires openssl gem 3.1 or later, and
     # is not available on JRuby.
     #
     # The default is +:minissl+, or the +PUMA_SSL_BACKEND+ environment variable.
