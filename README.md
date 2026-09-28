@@ -384,6 +384,27 @@ echo "this is my password"
 `key_password_command` can be used with `key` or `key_pem`. If the key
 is not encrypted, the executable will not be called.
 
+#### Choosing the SSL Backend (experimental)
+
+By default, Puma handles SSL with its own extension, MiniSSL. An experimental
+backend built on Ruby's `openssl` library takes the same `ssl_bind` options (not
+available for JRuby). It requires openssl gem 3.0 or later, which comes with
+Ruby 3.1 and later. On Ruby 3.0, add `gem "openssl"` to your Gemfile.
+
+Choose it in your config file:
+
+```ruby
+ssl_backend :openssl
+```
+
+Or with an environment variable:
+
+```
+$ PUMA_SSL_BACKEND=openssl puma -b 'ssl://127.0.0.1:9292?key=path_to_key&cert=path_to_cert'
+```
+
+To compare the backends on your machine, run `bundle exec ruby benchmarks/local/ssl_backends.rb`.
+
 ### Control/Status Server
 
 Puma has a built-in status and control app that can be used to query and control Puma.
