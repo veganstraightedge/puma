@@ -477,6 +477,22 @@ class TestConfigFile < PumaTest
     assert_equal :ruby, conf.options[:io_selector_backend]
   end
 
+  def test_config_ssl_backend
+    conf = Puma::Configuration.new do |c|
+      c.ssl_backend 'openssl'
+    end
+    conf.clamp
+
+    assert_equal :openssl, conf.options[:ssl_backend]
+  end
+
+  def test_config_ssl_backend_rejects_unknown_backend
+    conf = Puma::Configuration.new do |c|
+      assert_raises(ArgumentError) { c.ssl_backend :gnutls }
+    end
+    conf.clamp
+  end
+
   def test_config_raise_exception_on_sigterm
     conf = Puma::Configuration.new do |c|
       c.raise_exception_on_sigterm false
@@ -978,6 +994,17 @@ class TestConfigEnvVariables < PumaTest
     conf = Puma::Configuration.new({}, {}, env)
     conf.clamp
     assert_equal 95, conf.options.default_options[:persistent_timeout]
+  end
+
+  def test_config_loads_correct_ssl_backend
+    conf = Puma::Configuration.new({}, {}, {})
+    conf.clamp
+    assert_equal :minissl, conf.options.default_options[:ssl_backend]
+
+    env = { "PUMA_SSL_BACKEND" => "openssl" }
+    conf = Puma::Configuration.new({}, {}, env)
+    conf.clamp
+    assert_equal :openssl, conf.options.default_options[:ssl_backend]
   end
 
   def test_config_loads_correct_min_threads

@@ -170,6 +170,7 @@ module Puma
       remote_address: :socket,
       silence_fork_callback_warning: false,
       silence_single_worker_warning: false,
+      ssl_backend: :minissl, # PUMA_SSL_BACKEND
       tag: File.basename(Dir.getwd),
       tcp_host: '::'.freeze,
       tcp_port: 9292,
@@ -246,6 +247,7 @@ module Puma
       min = env['PUMA_MIN_THREADS'] || env['MIN_THREADS']
       max = env['PUMA_MAX_THREADS'] || env['MAX_THREADS']
       persistent_timeout = env['PUMA_PERSISTENT_TIMEOUT']
+      ssl_backend = env['PUMA_SSL_BACKEND']
       workers_env = env['WEB_CONCURRENCY']
       workers = workers_env && workers_env.strip != "" ? parse_workers(workers_env.strip) : nil
 
@@ -253,6 +255,7 @@ module Puma
         min_threads: min && min != "" && Integer(min),
         max_threads: max && max != "" && Integer(max),
         persistent_timeout: persistent_timeout && persistent_timeout != "" && Integer(persistent_timeout),
+        ssl_backend: ssl_backend && ssl_backend != "" && ssl_backend.to_sym,
         workers: workers,
         environment: env['APP_ENV'] || env['RACK_ENV'] || env['RAILS_ENV'],
       }

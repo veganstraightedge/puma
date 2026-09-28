@@ -1535,6 +1535,25 @@ module Puma
       @options[:io_selector_backend] = backend.to_sym
     end
 
+    # Specify the backend for SSL connections.
+    #
+    # +:minissl+ uses Puma's own extension. +:openssl+ uses Ruby's openssl
+    # library, and is experimental. It is not available on JRuby.
+    #
+    # The default is +:minissl+, or the +PUMA_SSL_BACKEND+ environment variable.
+    #
+    # @example
+    #   ssl_backend :openssl
+    #
+    def ssl_backend(backend)
+      backend = backend.to_sym
+      unless %i[minissl openssl].include?(backend)
+        raise ArgumentError, "ssl_backend must be :minissl or :openssl, not #{backend.inspect}"
+      end
+
+      @options[:ssl_backend] = backend
+    end
+
     # Ensures +STDOUT+ and +STDERR+ are immediately flushed to the underlying
     # operating system and are not buffered internally.
     #
