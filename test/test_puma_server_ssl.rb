@@ -348,6 +348,37 @@ class TestPumaServerSSL < PumaTest
       end
     end
 
+    def test_ssl_cipher_filter
+      cipher = 'ECDHE-RSA-AES128-GCM-SHA256'
+      start_server { |ctx| ctx.ssl_cipher_filter = cipher }
+
+      skt = send_http ctx: new_ctx { |c| c.max_version = :TLS1_2 }
+      assert_equal cipher, skt.cipher[0]
+
+      other_cipher = 'ECDHE-RSA-AES256-GCM-SHA384'
+      assert_raises(OpenSSL::SSL::SSLError) do
+        send_http ctx: new_ctx { |c|
+          c.max_version = :TLS1_2
+          c.ciphers = other_cipher
+        }
+      end
+    end
+
+    # Puma sets up Diffie-Hellman parameters, so a TLS 1.2 client that only
+    # offers a DHE cipher can connect.
+    def test_dhe_key_exchange
+      start_server
+      cipher = 'DHE-RSA-AES256-GCM-SHA384'
+
+      skt = send_http ctx: new_ctx { |c|
+        c.max_version = :TLS1_2
+        c.ciphers = cipher
+      }
+
+      assert_equal cipher, skt.cipher[0]
+      assert_equal 'https', skt.read_response.body
+    end
+
     # this may require updates if TLSv1.3 default ciphers change
     def test_ssl_ciphersuites
       skip('Requires TLSv1.3') unless Puma::MiniSSL::HAS_TLS1_3
@@ -463,6 +494,23 @@ class TestPumaServerSSLClient < PumaTest
 
   def test_verify_client_cert
     assert_ssl_client_error_match(false) do |client_ctx|
+      key = "#{CERT_PATH}/client.key"
+      crt = "#{CERT_PATH}/client.crt"
+      client_ctx.key = OpenSSL::PKey::RSA.new File.read(key)
+      client_ctx.cert = OpenSSL::X509::Certificate.new File.read(crt)
+      client_ctx.ca_file = "#{CERT_PATH}/ca.crt"
+      client_ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
+    end
+  end
+
+  # With CRL checking on and no CRL loaded, a client certificate that
+  # otherwise verifies is rejected.
+  def test_verification_flags_crl_check_without_crl
+    skip_if :jruby
+    ctx = CTX.dup
+    ctx.verification_flags = Puma::MiniSSL::VERIFICATION_FLAGS['CRL_CHECK']
+
+    assert_ssl_client_error_match(/unable to get certificate CRL/, context: ctx) do |client_ctx|
       key = "#{CERT_PATH}/client.key"
       crt = "#{CERT_PATH}/client.crt"
       client_ctx.key = OpenSSL::PKey::RSA.new File.read(key)
