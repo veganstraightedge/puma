@@ -43,7 +43,8 @@ class TestPumaServerSSL < PumaTest
   end
 
   # yields ctx to block, use for ctx setup & configuration
-  def start_server(&server_ctx)
+  # server_options are passed to Puma::Server
+  def start_server(server_options = {}, &server_ctx)
     app = lambda { |env| [200, {}, [env['rack.url_scheme']]] }
 
     ctx = Puma::MiniSSL::Context.new
@@ -63,7 +64,7 @@ class TestPumaServerSSL < PumaTest
     @log_stdout = StringIO.new
     @log_stderr = StringIO.new
     @log_writer = SSLLogWriterHelper.new @log_stdout, @log_stderr
-    @server = Puma::Server.new app, nil, {log_writer: @log_writer}
+    @server = Puma::Server.new app, nil, {log_writer: @log_writer}.merge(server_options)
     @port = (@server.add_ssl_listener HOST, 0, ctx).addr[1]
     @bind_port = @port
     @server.run
