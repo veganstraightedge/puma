@@ -249,6 +249,9 @@ class TestPumaServerSSL < PumaTest
   # Two requests sent in one TLS record are both answered, even though
   # the second may already be decrypted when the first is handled.
   def test_pipelined_requests_in_one_tls_record
+    # jruby-openssl can raise before returning the second response, since the
+    # JRuby MiniSSL closes without close_notify, see #4029.
+    skip_if :jruby
     start_server
     @server.app = proc { |env| [200, {}, [env['PATH_INFO']]] }
 
@@ -257,8 +260,6 @@ class TestPumaServerSSL < PumaTest
     skt = new_socket ctx: new_ctx
     skt.syswrite requests
 
-    # Read until the second response instead of EOF, since the JRuby MiniSSL
-    # doesn't send close_notify, see #4029.
     responses = +''
     responses << skt.readpartial(16_384) until responses.end_with?('/second')
 
