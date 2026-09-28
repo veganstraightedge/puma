@@ -75,6 +75,35 @@ class TestIntegrationSSL < TestIntegration
     end
   end
 
+  # In cluster mode the SSL context is built in the master process before
+  # forking, and the workers serve HTTPS with it.
+  def test_ssl_run_cluster
+    skip_unless :fork
+    cert_path = File.expand_path '../examples/puma', __dir__
+
+    cli_server "-w2 -t1:1", no_bind: true, config: <<~CONFIG
+      ssl_bind '#{HOST}', '#{bind_port}', {
+        cert: '#{cert_path}/cert_puma.pem',
+        key:  '#{cert_path}/puma_keypair.pem',
+        verify_mode: 'none'
+      }
+
+      app do |env|
+        [200, {}, [Process.pid.to_s]]
+      end
+    CONFIG
+    worker_pids = get_worker_pids 0, 2
+
+    pids = Array.new(6) do
+      http = Net::HTTP.new HOST, bind_port
+      http.use_ssl = true
+      http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+      http.start { http.get('/').body.to_i }
+    end
+
+    assert_empty pids - worker_pids
+  end
+
   # should use TLSv1.3 with OpenSSL 1.1 or later
   def test_verify_client_cert_roundtrip(tls1_2 = nil)
     cert_path = File.expand_path '../examples/puma/client_certs', __dir__
