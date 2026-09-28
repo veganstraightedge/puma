@@ -257,7 +257,10 @@ class TestPumaServerSSL < PumaTest
     skt = new_socket ctx: new_ctx
     skt.syswrite requests
 
-    responses = skt.read
+    # Read until the second response instead of EOF, since the JRuby MiniSSL
+    # doesn't send close_notify, see #4029.
+    responses = +''
+    responses << skt.readpartial(16_384) until responses.end_with?('/second')
 
     assert_equal 2, responses.scan('HTTP/1.1 200 OK').size
     assert_match %r{/first.*/second}m, responses
