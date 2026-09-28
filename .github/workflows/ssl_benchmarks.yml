@@ -1,9 +1,14 @@
 name: SSL benchmarks
 
-# Compares the SSL backends' throughput and memory on Linux. Run it by hand
-# from the Actions tab; the results are in the job summary.
+# Compares the SSL backends' throughput and memory on Linux. It runs when the
+# benchmarks change, or by hand from the Actions tab; the results are in the
+# job summary.
 
 on:
+  push:
+    paths:
+      - 'benchmarks/local/ssl_*.rb'
+      - '.github/workflows/ssl_benchmarks.yml'
   workflow_dispatch:
 
 permissions:
