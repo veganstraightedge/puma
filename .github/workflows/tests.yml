@@ -35,7 +35,7 @@ jobs:
 
   test_mri:
     name: >-
-      ${{ matrix.os }} ${{ matrix.ruby }}${{ matrix.no-ssl }}${{ matrix.yjit }}${{ matrix.rack-v }}
+      ${{ matrix.os }} ${{ matrix.ruby }}${{ matrix.no-ssl }}${{ matrix.yjit }}${{ matrix.rack-v }}${{ matrix.ssl-backend }}
     needs: [rubocop]
     env:
       CI: true
@@ -57,6 +57,7 @@ jobs:
         no-ssl: ['']
         rack-v: ['']
         yjit: ['']
+        ssl-backend: ['']
         include:
           - { os: windows-2025    , ruby:  ucrt }
           - { os: windows-2025    , ruby:  mswin }
@@ -68,6 +69,12 @@ jobs:
           - { os: ubuntu-22.04    , ruby:  head , yjit: ' yjit'     }
           - { os: ubuntu-22.04    , ruby:  3.2  , no-ssl: ' no SSL' }
           - { os: ubuntu-22.04    , ruby: '3.0' , rack-v: ' rack2'  }
+          - { os: ubuntu-24.04    , ruby:  3.1  , ssl-backend: ' openssl' }
+          - { os: ubuntu-24.04    , ruby:  3.4  , ssl-backend: ' openssl' }
+          - { os: ubuntu-24.04    , ruby: '4.0' , ssl-backend: ' openssl' }
+          - { os: ubuntu-24.04    , ruby:  head , ssl-backend: ' openssl' }
+          - { os: macos-26        , ruby: '4.0' , ssl-backend: ' openssl' }
+          - { os: windows-2025    , ruby:  ucrt , ssl-backend: ' openssl' }
 
         exclude:
           - { os: ubuntu-24.04    , ruby: '3.0' }
@@ -100,6 +107,11 @@ jobs:
         if: matrix.no-ssl == ' no SSL'
         shell: bash
         run: echo 'PUMA_DISABLE_SSL=true' >> $GITHUB_ENV
+
+      - name: Use the openssl SSL backend
+        if: matrix.ssl-backend == ' openssl'
+        shell: bash
+        run: echo 'PUMA_SSL_BACKEND=openssl' >> $GITHUB_ENV
 
       - name: Set Rack version, see Gemfile
         shell: bash
