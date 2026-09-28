@@ -91,7 +91,8 @@ module Puma
         @failed_peercert || @ssl_socket.peer_cert
       end
 
-      # Like +IO#read_nonblock+, but returns nil at EOF, as MiniSSL does.
+      # Like +IO#read_nonblock+, but returns nil at EOF, as MiniSSL does. Can
+      # return more than +size+, see #read_pending.
       def read_nonblock(size, buffer = nil, exception: true)
         return wait_readable(exception) unless handshake_complete?
 
@@ -99,9 +100,10 @@ module Puma
           data = translate_ssl_errors { @ssl_socket.read_nonblock(size, buffer, exception: false) }
 
           case data
+          when String then return read_pending(data)
           when :wait_readable then return wait_readable(exception)
           when :wait_writable then @ssl_socket.io.wait_writable
-          else return data
+          else return nil
           end
         end
       end
@@ -152,6 +154,19 @@ module Puma
       end
 
       private
+
+      # OpenSSL decrypts a whole TLS record at a time, and keeps what wasn't
+      # read. The socket isn't readable for that data, so the reactor would
+      # never come back for it. Appends it to +data+, as MiniSSL does.
+      def read_pending(data)
+        while @ssl_socket.pending.positive?
+          more = translate_ssl_errors { @ssl_socket.read_nonblock(@ssl_socket.pending, exception: false) }
+          break unless more.is_a?(String)
+
+          data << more
+        end
+        data
+      end
 
       # Returns true once the handshake is complete, false while it waits on
       # the client.
