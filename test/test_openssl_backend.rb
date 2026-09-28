@@ -46,6 +46,25 @@ class TestOpenSSLBackendContextBuilder < PumaTest
     assert_equal certificate, peer_cert_from_handshake(ssl_context)
   end
 
+  def test_key_password_command_not_run_for_unencrypted_key
+    skip_if :windows
+    ssl_context = build_ssl_context { |ctx| ctx.key_password_command = "false" }
+
+    assert_equal certificate, peer_cert_from_handshake(ssl_context)
+  end
+
+  def test_failed_key_password_command_raises_its_error
+    skip_if :windows
+    error = assert_raises(RuntimeError) do
+      build_ssl_context do |ctx|
+        ctx.key = "#{CERT_PATH}/encrypted_puma_keypair.pem"
+        ctx.key_password_command = "false"
+      end
+    end
+
+    assert_includes error.message, "Key password failed"
+  end
+
   def test_default_cipher_filter
     expected = OpenSSL::SSL::SSLContext.new.tap { |c| c.ciphers = "HIGH:!aNULL@STRENGTH" }.ciphers
 

@@ -63,8 +63,21 @@ module Puma
 
       def private_key
         pem = @ctx.key_pem || File.read(@ctx.key)
-        password = @ctx.key_password if @ctx.key_password_command
-        OpenSSL::PKey.read pem, password
+        return OpenSSL::PKey.read(pem) unless @ctx.key_password_command
+
+        # OpenSSL only calls the block for an encrypted key. It discards an
+        # error raised in the block, so keep it to raise instead.
+        password_error = nil
+        OpenSSL::PKey.read(pem) do
+          @ctx.key_password
+        rescue => e
+          password_error = e
+          nil
+        end
+      rescue OpenSSL::PKey::PKeyError
+        raise password_error if password_error
+
+        raise
       end
 
       def cert_store
