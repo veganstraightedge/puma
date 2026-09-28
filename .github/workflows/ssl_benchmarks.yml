@@ -1,0 +1,47 @@
+name: SSL benchmarks
+
+# Compares the SSL backends' throughput and memory on Linux. Run it by hand
+# from the Actions tab; the results are in the job summary.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
+jobs:
+  ssl_benchmarks:
+    name: ${{ matrix.os }} ${{ matrix.ruby }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-24.04 ]
+        ruby: [ '4.0' ]
+
+    steps:
+      - name: repo checkout
+        uses: actions/checkout@v7
+
+      - name: load ruby, ragel, ApacheBench
+        uses: ruby/setup-ruby-pkgs@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          apt-get: ragel apache2-utils
+          bundler-cache: true
+        timeout-minutes: 10
+
+      - name: compile
+        run: bundle exec rake compile
+
+      - name: throughput
+        timeout-minutes: 20
+        run: |
+          bundle exec ruby benchmarks/local/ssl_backends.rb | tee throughput.md
+          { echo '## Throughput'; echo; cat throughput.md; echo; } >> $GITHUB_STEP_SUMMARY
+
+      - name: memory
+        timeout-minutes: 20
+        run: |
+          bundle exec ruby benchmarks/local/ssl_memory.rb | tee memory.md
+          { echo '## Memory'; echo; cat memory.md; echo; } >> $GITHUB_STEP_SUMMARY
